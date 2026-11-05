@@ -1,6 +1,6 @@
 # Auth emails: confirmation and password-reset links
 
-wacrm uses Supabase Auth for sign-up, sign-in and password reset. Two
+Automize CRM uses Supabase Auth for sign-up, sign-in and password reset. Two
 of those flows send an email with a link, and the link has to come back
 to **your** deployment. This page explains how the app asks for that,
 what Supabase needs to be told for it to comply, and what the symptoms

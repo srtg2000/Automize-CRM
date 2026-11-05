@@ -25,13 +25,19 @@ export async function generateMetadata(): Promise<Metadata> {
   return {
     ...metadata,
     description: t("description"),
+    openGraph: {
+      title: "Automize CRM",
+      description: t("description"),
+      siteName: "Automize CRM",
+    },
   };
 }
 
 const metadata: Metadata = {
+  applicationName: "Automize CRM",
   title: {
-    default: "wacrm",
-    template: "%s — wacrm",
+    default: "Automize CRM",
+    template: "%s - Automize CRM",
   },
   robots: {
     index: false,

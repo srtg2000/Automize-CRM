@@ -1,6 +1,6 @@
-# wacrm — CRM Template for WhatsApp
+# Automize CRM
 
-> Self-hostable CRM template for WhatsApp® — shared inbox, contacts,
+> Self-hostable WhatsApp® CRM — shared inbox, contacts,
 > sales pipelines, broadcasts, and no-code automations. Fork it, brand
 > it, host it.
 
@@ -110,7 +110,7 @@ Dockerfile + Docker Compose setup.
   </a>
 </p>
 
-**wacrm is built to run on [Hostinger](https://www.hostinger.com/web-apps-hosting?REFERRALCODE=WACRMHOST).**
+**Automize CRM is built to run on [Hostinger](https://www.hostinger.com/web-apps-hosting?REFERRALCODE=WACRMHOST).**
 It's the path we test, document, and recommend — and the fastest way
 to get a production-grade CRM live without owning a VPS or a
 Kubernetes cluster.
@@ -139,7 +139,7 @@ Kubernetes cluster.
 Full walkthrough with screenshots:
 **[wacrm.tech/docs/deployment-hostinger](https://wacrm.tech/docs/deployment-hostinger)**.
 
-> _Note: wacrm is MIT-licensed and runs anywhere Node.js does
+> _Note: Automize CRM is MIT-licensed and runs anywhere Node.js does
 > (Vercel, Railway, your own VPS). Hostinger is recommended, not
 > required._
 
@@ -148,7 +148,7 @@ Full walkthrough with screenshots:
 Full self-host documentation — Supabase migrations, WhatsApp Business
 API config, and production deploy — lives at
 **[wacrm.tech/docs](https://wacrm.tech/docs)**
-(source: [ArnasDon/wacrm-site](https://github.com/ArnasDon/wacrm-site)).
+(source: [ArnasDon/Automize CRM-site](https://github.com/ArnasDon/wacrm-site)).
 
 Key pages:
 - [Getting started](https://wacrm.tech/docs/getting-started)

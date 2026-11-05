@@ -1,7 +1,7 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
-  "name": "io.github.ArnasDon/wacrm-mcp",
-  "description": "Drive a self-hosted wacrm WhatsApp CRM from Claude, Cursor and other MCP clients.",
+  "name": "io.github.ArnasDon/automize-crm-mcp",
+  "description": "Drive a self-hosted Automize CRM instance from Claude, Cursor and other MCP clients.",
   "repository": {
     "url": "https://github.com/ArnasDon/wacrm",
     "source": "github",
@@ -11,7 +11,7 @@
   "packages": [
     {
       "registryType": "npm",
-      "identifier": "wacrm-mcp",
+      "identifier": "automize-crm-mcp",
       "version": "0.1.1",
       "transport": {
         "type": "stdio"
@@ -19,14 +19,14 @@
       "environmentVariables": [
         {
           "name": "WACRM_BASE_URL",
-          "description": "Base URL of your wacrm instance, e.g. https://crm.example.com",
+          "description": "Base URL of your Automize CRM instance, e.g. https://crm.example.com",
           "isRequired": true,
           "isSecret": false,
           "format": "string"
         },
         {
           "name": "WACRM_API_KEY",
-          "description": "wacrm API key (Settings → API keys). Its scopes decide what is allowed.",
+          "description": "Automize CRM API key (Settings → API keys). Its scopes decide what is allowed.",
           "isRequired": true,
           "isSecret": true,
           "format": "string"

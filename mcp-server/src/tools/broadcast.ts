@@ -11,10 +11,10 @@
 
 import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import type { WacrmClient } from '../client.js';
+import type { AutomizeCrmClient } from '../client.js';
 import { errorResult, handle, jsonResult } from './shared.js';
 
-export function registerBroadcastTools(server: McpServer, client: WacrmClient): void {
+export function registerBroadcastTools(server: McpServer, client: AutomizeCrmClient): void {
   server.registerTool(
     'send_broadcast',
     {

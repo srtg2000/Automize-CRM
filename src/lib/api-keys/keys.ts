@@ -14,7 +14,7 @@
 //
 // Why the `wacrm_live_` prefix
 //   - Self-identifying: a leaked string is instantly recognisable as
-//     a wacrm key (handy for secret-scanners like GitGuardian).
+//     an API key (handy for secret-scanners like GitGuardian).
 //   - Forward-compatible: leaves room for a `wacrm_test_` variant if
 //     a sandbox mode is ever added, without reshaping the format.
 // ============================================================

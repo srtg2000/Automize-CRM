@@ -1,7 +1,7 @@
 // ============================================================
 // Configuration — read once at startup from the environment.
 //
-// The server needs the URL of a wacrm instance and an API key.
+// The server needs the URL of an Automize CRM instance and an API key.
 // Two opt-in flags decide whether write / broadcast tools are
 // registered at all: by default the server is READ-ONLY, so an
 // MCP client can never see a tool that mutates data or sends a
@@ -33,7 +33,7 @@ export function loadConfig(): Config {
   if (missing.length > 0) {
     throw new Error(
       `Missing required environment variable(s): ${missing.join(', ')}. ` +
-        `Set WACRM_BASE_URL to your instance URL (e.g. https://crm.example.com) ` +
+        `Set WACRM_BASE_URL to your Automize CRM instance URL (e.g. https://crm.example.com) ` +
         `and WACRM_API_KEY to a key from Settings → API keys.`,
     );
   }

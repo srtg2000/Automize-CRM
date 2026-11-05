@@ -1,6 +1,6 @@
 # Public API (`/api/v1`)
 
-The public API lets you drive your wacrm instance from your own
+The public API lets you drive your Automize CRM instance from your own
 scripts and automations — send messages, manage contacts, launch
 broadcasts — without going through the dashboard UI.
 
@@ -27,7 +27,7 @@ In the dashboard: **Settings → API keys → New API key**. Only
 
 1. Give the key a name (after the integration that will use it).
 2. Grant the **scopes** it needs — nothing more (see below).
-3. Copy the key. **The full key is shown exactly once.** wacrm
+3. Copy the key. **The full key is shown exactly once.** Automize CRM
    stores only a SHA-256 hash, so it can never be shown again. If you
    lose it, revoke it and create a new one.
 
@@ -301,7 +301,7 @@ is returned.
 
 ## Webhooks
 
-Rather than polling, register an endpoint and wacrm will POST to it when
+Rather than polling, register an endpoint and Automize CRM will POST to it when
 things happen in your account. **Migration required:** apply
 `supabase/migrations/028_webhook_endpoints.sql`.
 
@@ -317,7 +317,7 @@ things happen in your account. **Migration required:** apply
 
 All under scope `webhooks:manage`.
 
-- `POST /api/v1/webhooks` — register `{ "url": "https://…", "events": ["message.received"] }`. `url` must be `https://` and must not embed a username or password (`https://user:pass@…` is rejected with `400`; verify deliveries with the signing secret instead). **The response includes `secret` exactly once** — store it to verify signatures; wacrm keeps only an encrypted copy.
+- `POST /api/v1/webhooks` — register `{ "url": "https://…", "events": ["message.received"] }`. `url` must be `https://` and must not embed a username or password (`https://user:pass@…` is rejected with `400`; verify deliveries with the signing secret instead). **The response includes `secret` exactly once** — store it to verify signatures; Automize CRM keeps only an encrypted copy.
 - `GET /api/v1/webhooks` — list your endpoints (never returns the secret).
 - `GET /api/v1/webhooks/{id}` — read one.
 - `PATCH /api/v1/webhooks/{id}` — update `url`, `events`, or `is_active` (re-enabling clears the failure counter).
@@ -377,7 +377,7 @@ const ok = crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(v1));
 
 Delivery is **best-effort**: a single attempt per event with a short
 timeout, and **redirects are not followed**. `message.status_updated`
-covers messages wacrm stores (inbox + API sends), not broadcast-only
+covers messages Automize CRM stores (inbox + API sends), not broadcast-only
 sends, and — because providers re-send and re-order status callbacks —
 the same status may arrive more than once or out of order; **dedupe on
 `id` and don't assume ordering**. Each consecutive failure increments

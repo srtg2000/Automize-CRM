@@ -9,7 +9,7 @@
 
 import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import type { WacrmClient } from '../client.js';
+import type { AutomizeCrmClient } from '../client.js';
 import { handle, jsonResult } from './shared.js';
 
 const templateSchema = z
@@ -23,7 +23,7 @@ const templateSchema = z
   })
   .describe('Template payload — required when type is "template".');
 
-export function registerWriteTools(server: McpServer, client: WacrmClient): void {
+export function registerWriteTools(server: McpServer, client: AutomizeCrmClient): void {
   server.registerTool(
     'send_message',
     {
