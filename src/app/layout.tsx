@@ -44,7 +44,7 @@ const metadata: Metadata = {
     follow: false,
   },
   icons: {
-    icon: [{ url: "/icon" }],
+    icon: [{ url: "/logo-icon.svg", type: "image/svg+xml" }],
   },
   formatDetection: {
     email: false,

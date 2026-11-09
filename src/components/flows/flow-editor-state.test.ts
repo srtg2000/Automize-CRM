@@ -93,6 +93,7 @@ describe("defaultConfigFor", () => {
     "collect_input",
     "condition",
     "set_tag",
+    "register_webinar",
     "handoff",
     "end",
   ];
@@ -134,9 +135,23 @@ describe("defaultConfigFor", () => {
   it("end's default is an empty object (terminal — no config)", () => {
     expect(defaultConfigFor("end")).toEqual({});
   });
+
+  it("register_webinar starts without a selection or next node", () => {
+    expect(defaultConfigFor("register_webinar")).toEqual({
+      webinarId: "",
+      next_node_key: null,
+    });
+  });
 });
 
 describe("buildNewNode", () => {
+  it("creates a Register to Webinar node with its default config", () => {
+    expect(buildNewNode("register_webinar", [])).toMatchObject({
+      node_type: "register_webinar",
+      config: { webinarId: "", next_node_key: null },
+    });
+  });
+
   it("gives back-to-back additions distinct keys when fed the running node list", () => {
     let nodes: BuilderNode[] = [];
     const first = buildNewNode("send_message", nodes);

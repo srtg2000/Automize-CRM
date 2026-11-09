@@ -78,6 +78,7 @@ import {
 } from '@/lib/flows/edges';
 import { autoLayout, shouldAutoLayout } from '@/lib/flows/layout';
 import {
+  CREATABLE_NODE_TYPES,
   NODE_META,
   NodeIconChip,
   groupNodeTypesByCategory,
@@ -691,19 +692,6 @@ function NodeEditSheet({
 // center of the visible viewport rather than appending to a list.
 // ============================================================
 
-const ADD_NODE_TYPES: NodeType[] = [
-  'start',
-  'send_buttons',
-  'send_list',
-  'send_message',
-  'send_media',
-  'collect_input',
-  'condition',
-  'set_tag',
-  'handoff',
-  'end',
-];
-
 function CanvasAddNodeButton({ t }: { t: ReturnType<typeof useTranslations> }) {
   const reactFlow = useReactFlow();
   const { addNode, updateNodePosition } = useFlowEditor();
@@ -745,7 +733,7 @@ function CanvasAddNodeButton({ t }: { t: ReturnType<typeof useTranslations> }) {
         align="start"
         className="border-border bg-popover w-[268px] p-1.5"
       >
-        {groupNodeTypesByCategory(ADD_NODE_TYPES).map((group, i) => (
+        {groupNodeTypesByCategory(CREATABLE_NODE_TYPES).map((group, i) => (
           // DropdownMenuGroup (base-ui Menu.Group) is REQUIRED: the
           // DropdownMenuLabel below is base-ui's Menu.GroupLabel, which
           // throws at render without a Menu.Group ancestor. A plain <div>

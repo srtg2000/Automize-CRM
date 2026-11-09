@@ -17,7 +17,14 @@
  * are list-only and have no canvas analogue.
  */
 
-import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  Fragment,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { useTranslations } from 'next-intl';
 import {
   CircleAlert,
@@ -49,6 +56,7 @@ import {
 import { cn } from '@/lib/utils';
 import { type ValidationIssue } from '@/lib/flows/validate';
 import {
+  CREATABLE_NODE_TYPES,
   NODE_META,
   NodeIconChip,
   groupNodeTypesByCategory,
@@ -62,6 +70,7 @@ import { NodeConfigForm } from './forms/node-config-form';
 import { NodeKeySelect } from './forms/fields';
 import { IssueLine } from './validation-panel';
 import { useFlowEditor, type BuilderState } from './flow-editor-state';
+import { WebhookTriggerConfig } from './webhook-trigger-config';
 
 // ============================================================
 // Local state shape — mirrors the DB but the configs are typed
@@ -76,6 +85,7 @@ import { useFlowEditor, type BuilderState } from './flow-editor-state';
 export function FlowBuilder() {
   const t = useTranslations('Flows.builder');
   const {
+    flow,
     state,
     setState,
     issues,
@@ -160,6 +170,7 @@ export function FlowBuilder() {
         state={state}
         setState={setState}
         triggerIssues={issues.filter((i) => i.scope === 'trigger')}
+        flowId={flow.id}
         t={t}
       />
 
@@ -175,7 +186,9 @@ export function FlowBuilder() {
 
         {state.nodes.length === 0 ? (
           <div className="border-border bg-card/50 text-muted-foreground rounded-lg border border-dashed p-8 text-center text-sm">
-            {t.rich('nodesEmpty', { strong: (chunks) => <strong>{chunks}</strong> })}
+            {t.rich('nodesEmpty', {
+              strong: (chunks) => <strong>{chunks}</strong>,
+            })}
           </div>
         ) : (
           state.nodes.map((node) => (
@@ -265,16 +278,20 @@ function TriggerPanel({
   state,
   setState,
   triggerIssues,
+  flowId,
   t,
 }: {
   state: BuilderState;
   setState: React.Dispatch<React.SetStateAction<BuilderState>>;
   triggerIssues: ValidationIssue[];
+  flowId: string;
   t: ReturnType<typeof useTranslations>;
 }) {
   return (
     <section className="border-border bg-card rounded-lg border p-4">
-      <h2 className="text-foreground mb-3 text-sm font-semibold">{t('triggerTitle')}</h2>
+      <h2 className="text-foreground mb-3 text-sm font-semibold">
+        {t('triggerTitle')}
+      </h2>
       <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
         <div>
           <label className="text-muted-foreground mb-1 block text-xs">
@@ -287,7 +304,11 @@ function TriggerPanel({
                 ...s,
                 trigger_type: v as BuilderState['trigger_type'],
                 trigger_config:
-                  v === 'keyword' ? { keywords: [] } : v === 'manual' ? {} : {},
+                  v === 'keyword'
+                    ? { keywords: [] }
+                    : v === 'webhook'
+                      ? { field_mappings: {}, captured_fields: [] }
+                      : {},
               }))
             }
           >
@@ -301,8 +322,9 @@ function TriggerPanel({
               <SelectItem value="first_inbound_message">
                 {t('triggerFirstInboundTitle')}
               </SelectItem>
-              <SelectItem value="manual">
-                {t('triggerManualTitle')}
+              <SelectItem value="manual">{t('triggerManualTitle')}</SelectItem>
+              <SelectItem value="webhook">
+                {t('webhookTriggerTitle')}
               </SelectItem>
             </SelectContent>
           </Select>
@@ -329,6 +351,15 @@ function TriggerPanel({
           </div>
         )}
       </div>
+      {state.trigger_type === 'webhook' && (
+        <WebhookTriggerConfig
+          flowId={flowId}
+          config={state.trigger_config}
+          onChange={(trigger_config) =>
+            setState((current) => ({ ...current, trigger_config }))
+          }
+        />
+      )}
       {triggerIssues.length > 0 && (
         <div className="mt-3 flex flex-col gap-1">
           {triggerIssues.map((i, ix) => (
@@ -357,7 +388,9 @@ function EntryPicker({
   return (
     <section className="border-border bg-card flex items-center gap-3 rounded-lg border p-3">
       <CornerDownRight className="text-primary h-4 w-4 shrink-0" />
-      <span className="text-muted-foreground text-xs">{t('entryNodeTitle')}</span>
+      <span className="text-muted-foreground text-xs">
+        {t('entryNodeTitle')}
+      </span>
       <NodeKeySelect
         value={state.entry_node_id}
         nodes={state.nodes}
@@ -579,19 +612,13 @@ function NodeConfigWithAdvanced({
 // Add-node menu
 // ============================================================
 
-function AddNodeButton({ onAdd, t }: { onAdd: (type: NodeType) => void; t: ReturnType<typeof useTranslations> }) {
-  const types: NodeType[] = [
-    'start',
-    'send_buttons',
-    'send_list',
-    'send_message',
-    'send_media',
-    'collect_input',
-    'condition',
-    'set_tag',
-    'handoff',
-    'end',
-  ];
+function AddNodeButton({
+  onAdd,
+  t,
+}: {
+  onAdd: (type: NodeType) => void;
+  t: ReturnType<typeof useTranslations>;
+}) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
@@ -602,7 +629,7 @@ function AddNodeButton({ onAdd, t }: { onAdd: (type: NodeType) => void; t: Retur
         {t('addNode')}
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="border-border bg-popover">
-        {groupNodeTypesByCategory(types).map((group, i) => (
+        {groupNodeTypesByCategory(CREATABLE_NODE_TYPES).map((group, i) => (
           // A DropdownMenuGroup (base-ui Menu.Group) is REQUIRED here:
           // DropdownMenuLabel is base-ui's Menu.GroupLabel, which throws
           // at render if it can't find a Menu.Group ancestor context. A

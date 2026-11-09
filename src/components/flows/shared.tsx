@@ -20,6 +20,7 @@ import {
   Flag,
   GitFork,
   Inbox,
+  CalendarDays,
   ListChecks,
   ListPlus,
   MessageCircle,
@@ -49,6 +50,7 @@ export type NodeType =
   | 'collect_input'
   | 'condition'
   | 'set_tag'
+  | 'register_webinar'
   | 'handoff'
   | 'end';
 
@@ -145,6 +147,12 @@ export const NODE_META: Record<
     color: 'text-pink-400',
     category: 'logic',
   },
+  register_webinar: {
+    slugSeed: 'Register to webinar',
+    icon: CalendarDays,
+    color: 'text-violet-400',
+    category: 'logic',
+  },
   handoff: {
     slugSeed: 'Handoff to agent',
     icon: UserPlus,
@@ -158,6 +166,21 @@ export const NODE_META: Record<
     category: 'flow',
   },
 };
+
+/** Node types available from both the list and canvas add-node menus. */
+export const CREATABLE_NODE_TYPES: NodeType[] = [
+  'start',
+  'send_buttons',
+  'send_list',
+  'send_message',
+  'send_media',
+  'collect_input',
+  'condition',
+  'set_tag',
+  'register_webinar',
+  'handoff',
+  'end',
+];
 
 /**
  * Bucket an ordered list of node types by category, preserving both
@@ -195,6 +218,7 @@ const NODE_HUE: Record<NodeType, { l: number; c: number; h: number }> = {
   collect_input: { l: 0.65, c: 0.1, h: 185 }, // teal — capture
   condition: { l: 0.72, c: 0.15, h: 65 }, // amber — a fork in the road
   set_tag: { l: 0.65, c: 0.15, h: 350 }, // pink
+  register_webinar: { l: 0.62, c: 0.15, h: 295 }, // violet
   handoff: { l: 0.65, c: 0.17, h: 16 }, // rose — hands off
   end: { l: 0.55, c: 0.01, h: 260 }, // neutral grey — terminal
 };
@@ -295,6 +319,28 @@ export function truncate(s: string, max = 80): string {
   return clean.slice(0, max - 1) + '…';
 }
 
+function summaryTranslation(
+  t: ((key: string, values?: Record<string, string | number>) => string) | undefined,
+  key: string,
+  fallback: string,
+  values?: Record<string, string | number>
+): string {
+  if (!t) return fallback;
+  try {
+    return t(key, values);
+  } catch (error) {
+    if (
+      typeof error === 'object' &&
+      error !== null &&
+      'code' in error &&
+      error.code === 'MISSING_MESSAGE'
+    ) {
+      return fallback;
+    }
+    throw error;
+  }
+}
+
 export function summarizeNode(
   node: BuilderNode,
   t?: (key: string, values?: Record<string, string | number>) => string
@@ -340,7 +386,10 @@ export function summarizeNode(
       }
       return rowCount > 0
         ? t
-          ? t('optionsAcrossSections', { rowCount, sectionCount: sections.length })
+          ? t('optionsAcrossSections', {
+              rowCount,
+              sectionCount: sections.length,
+            })
           : `${rowCount} option${rowCount === 1 ? '' : 's'} across ${sections.length} section${sections.length === 1 ? '' : 's'}`
         : null;
     }
@@ -351,9 +400,15 @@ export function summarizeNode(
       const url = typeof cfg.media_url === 'string' ? cfg.media_url : '';
       const caption = typeof cfg.caption === 'string' ? cfg.caption : '';
       const label = mediaType
-        ? t ? t(mediaType) || (mediaType.charAt(0).toUpperCase() + mediaType.slice(1)) : mediaType.charAt(0).toUpperCase() + mediaType.slice(1)
-        : t ? t('media') : 'Media';
-      if (!url) return t ? t('noFile', { label }) : `${label} (no file uploaded)`;
+        ? t
+          ? t(mediaType) ||
+            mediaType.charAt(0).toUpperCase() + mediaType.slice(1)
+          : mediaType.charAt(0).toUpperCase() + mediaType.slice(1)
+        : t
+          ? t('media')
+          : 'Media';
+      if (!url)
+        return t ? t('noFile', { label }) : `${label} (no file uploaded)`;
       const name = filename || url.split('/').pop() || 'file';
       return caption
         ? `${label}: ${truncate(name, 30)} · ${truncate(caption, 40)}`
@@ -381,17 +436,25 @@ export function summarizeNode(
             : 'var';
       const subjectStr =
         subject === 'tag'
-          ? t ? t('hasTag', { tag: truncate(subjectKey, 24) }) : `has tag ${truncate(subjectKey, 24)}`
+          ? t
+            ? t('hasTag', { tag: truncate(subjectKey, 24) })
+            : `has tag ${truncate(subjectKey, 24)}`
           : `${subject}.${subjectKey}`;
       const op =
         cfg.operator === 'equals'
           ? '=='
           : cfg.operator === 'contains'
-            ? t ? t('opContains') : 'contains'
+            ? t
+              ? t('opContains')
+              : 'contains'
             : cfg.operator === 'present'
-              ? t ? t('opExists') : 'exists'
+              ? t
+                ? t('opExists')
+                : 'exists'
               : cfg.operator === 'absent'
-                ? t ? t('opMissing') : 'missing'
+                ? t
+                  ? t('opMissing')
+                  : 'missing'
                 : '';
       const value = typeof cfg.value === 'string' ? cfg.value : '';
       const valStr =
@@ -401,14 +464,38 @@ export function summarizeNode(
       return subject === 'tag' ? subjectStr : `${subjectStr} ${op}${valStr}`;
     }
     case 'set_tag': {
-      const mode = cfg.mode === 'remove' ? (t ? t('modeRemove') : 'Remove') : (t ? t('modeAdd') : 'Add');
+      const mode =
+        cfg.mode === 'remove'
+          ? t
+            ? t('modeRemove')
+            : 'Remove'
+          : t
+            ? t('modeAdd')
+            : 'Add';
       const tagId = typeof cfg.tag_id === 'string' ? cfg.tag_id : '';
       // No tag name available without an async lookup here; show a
       // short prefix of the UUID so users can disambiguate between
       // multiple set_tag nodes at a glance.
       return tagId
-        ? t ? t('tagPicked', { mode, tag: tagId.slice(0, 8) }) : `${mode} tag ${tagId.slice(0, 8)}…`
-        : t ? t('tagNone', { mode }) : `${mode} tag (none picked)`;
+        ? t
+          ? t('tagPicked', { mode, tag: tagId.slice(0, 8) })
+          : `${mode} tag ${tagId.slice(0, 8)}…`
+        : t
+          ? t('tagNone', { mode })
+          : `${mode} tag (none picked)`;
+    }
+    case 'register_webinar': {
+      const webinarId = typeof cfg.webinarId === 'string' ? cfg.webinarId : '';
+      if (!webinarId) {
+        return summaryTranslation(t, 'webinarNone', 'No webinar selected');
+      }
+      const shortId = webinarId.slice(0, 8);
+      return summaryTranslation(
+        t,
+        'webinarPicked',
+        `Register for webinar ${shortId}`,
+        { webinar: shortId }
+      );
     }
     case 'handoff': {
       const note = typeof cfg.note === 'string' ? cfg.note : '';
