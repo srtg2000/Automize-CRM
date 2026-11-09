@@ -9,6 +9,7 @@ import { POST } from './route';
 
 function createAdmin({
   webinar = {
+    account_id: 'account-1',
     start_time: '2030-01-02T00:00:00.000Z',
     reminder_rules: [
       {
@@ -45,12 +46,21 @@ function createAdmin({
   registrant = { id: 'registrant-1' },
   registrantError = null,
   queueError = null,
+  rateLimitResult = true,
+  rateLimitError = null,
 }: {
-  webinar?: { start_time: string; reminder_rules?: unknown } | null;
+  webinar?: {
+    account_id?: string;
+    start_time: string;
+    reminder_rules?: unknown;
+    webhook_secret_hash?: string | null;
+  } | null;
   webinarError?: { message: string } | null;
   registrant?: { id: string } | null;
   registrantError?: { message: string } | null;
   queueError?: { message: string } | null;
+  rateLimitResult?: boolean;
+  rateLimitError?: { message: string } | null;
 } = {}) {
   const calls = { upsert: vi.fn(), insert: vi.fn() };
   const webinarQuery = {
@@ -78,6 +88,10 @@ function createAdmin({
   };
 
   const admin = {
+    rpc: vi.fn().mockResolvedValue({
+      data: rateLimitResult,
+      error: rateLimitError,
+    }),
     from: vi.fn((table: string) => {
       if (table === 'webinars') return webinarQuery;
       if (table === 'webinar_registrants') return registrantQuery;
@@ -96,7 +110,10 @@ function post(payload: unknown, webinarId?: string) {
       }`,
       {
         method: 'POST',
-        headers: { 'content-type': 'application/json' },
+        headers: {
+          'content-type': 'application/json',
+          'x-webhook-secret': 'sheets-test-secret',
+        },
         body: JSON.stringify(payload),
       }
     )
@@ -106,6 +123,7 @@ function post(payload: unknown, webinarId?: string) {
 describe('POST /api/webhooks/sheets-ingest', () => {
   beforeEach(() => {
     vi.useRealTimers();
+    process.env.SHEETS_INGEST_SECRET = 'sheets-test-secret';
   });
 
   it('validates required fields and international phone format', async () => {
@@ -142,6 +160,7 @@ describe('POST /api/webhooks/sheets-ingest', () => {
     expect(calls.upsert).toHaveBeenCalledWith(
       {
         webinar_id: 'webinar-1',
+        account_id: 'account-1',
         phone: '14155550123',
         name: 'Jane Doe',
         custom_data: { source: 'sheets' },
@@ -177,6 +196,73 @@ describe('POST /api/webhooks/sheets-ingest', () => {
     });
 
     expect(response.status).toBe(404);
+  });
+
+  it('rejects unauthorized requests before rate limiting or writes', async () => {
+    const { admin } = createAdmin();
+    supabaseAdmin.mockReturnValue(admin);
+
+    const response = await POST(
+      new Request(
+        'http://localhost/api/webhooks/sheets-ingest?webinar_id=webinar-1',
+        {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ phone: '+14155550123' }),
+        }
+      )
+    );
+
+    expect(response.status).toBe(401);
+    expect(admin.rpc).not.toHaveBeenCalled();
+  });
+
+  it('rejects requests over the webinar rate limit', async () => {
+    const { admin, calls } = createAdmin({ rateLimitResult: false });
+    supabaseAdmin.mockReturnValue(admin);
+
+    const response = await post(
+      { webinar_id: 'webinar-1', phone: '+14155550123' },
+      'webinar-1'
+    );
+
+    expect(response.status).toBe(429);
+    expect(response.headers.get('retry-after')).toBeTruthy();
+    expect(calls.upsert).not.toHaveBeenCalled();
+  });
+
+  it('accepts a secret matching the stored webinar hash', async () => {
+    const secret = 'webinar-secret-that-is-long-enough-to-use';
+    const crypto = await import('node:crypto');
+    const { admin, calls } = createAdmin({
+      webinar: {
+        account_id: 'account-1',
+        start_time: '2030-01-02T00:00:00.000Z',
+        reminder_rules: [],
+        webhook_secret_hash: crypto
+          .createHash('sha256')
+          .update(secret)
+          .digest('hex'),
+      },
+    });
+    supabaseAdmin.mockReturnValue(admin);
+
+    const response = await POST(
+      new Request(
+        'http://localhost/api/webhooks/sheets-ingest?webinar_id=webinar-1',
+        {
+          method: 'POST',
+          headers: {
+            'content-type': 'application/json',
+            'x-webhook-secret': secret,
+          },
+          body: JSON.stringify({ phone: '+14155550123' }),
+        }
+      )
+    );
+
+    expect(response.status).toBe(200);
+    expect(calls.upsert).toHaveBeenCalled();
   });
 
   it('uses the webinar id from the shareable URL and rejects conflicting payload ids', async () => {

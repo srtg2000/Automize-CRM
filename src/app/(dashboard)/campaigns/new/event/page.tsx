@@ -111,6 +111,7 @@ export default function NewEventCampaignPage() {
   const [step, setStep] = useState(0);
   const [saving, setSaving] = useState(false);
   const [campaignId, setCampaignId] = useState('');
+  const [webhookSecret, setWebhookSecret] = useState('');
   const [origin, setOrigin] = useState('');
   const [created, setCreated] = useState(false);
   const [registeredCount, setRegisteredCount] = useState(0);
@@ -141,6 +142,12 @@ export default function NewEventCampaignPage() {
 
   useEffect(() => {
     setCampaignId(crypto.randomUUID());
+    const secretBytes = crypto.getRandomValues(new Uint8Array(32));
+    setWebhookSecret(
+      Array.from(secretBytes, (byte) =>
+        byte.toString(16).padStart(2, '0')
+      ).join('')
+    );
     setOrigin(window.location.origin);
     let active = true;
     void fetch('/api/whatsapp/templates')
@@ -175,6 +182,7 @@ export default function NewEventCampaignPage() {
   );
   const scriptSnippet = useMemo(
     () => `const WEBHOOK_URL = '${webhookUrl}';
+const WEBHOOK_SECRET = '${webhookSecret}';
 const NAME_COLUMN = '${nameColumn}';
 const PHONE_COLUMN = '${phoneColumn}';
 
@@ -187,6 +195,7 @@ function onFormSubmit(e) {
   const response = UrlFetchApp.fetch(WEBHOOK_URL, {
     method: 'post',
     contentType: 'application/json',
+    headers: { 'X-Webhook-Secret': WEBHOOK_SECRET },
     payload: JSON.stringify({
       name: (answers[NAME_COLUMN] || [''])[0],
       phone: (answers[PHONE_COLUMN] || [''])[0],
@@ -196,7 +205,7 @@ function onFormSubmit(e) {
   });
   console.log(response.getResponseCode(), response.getContentText());
 }`,
-    [nameColumn, phoneColumn, webhookUrl]
+    [nameColumn, phoneColumn, webhookSecret, webhookUrl]
   );
   const csvColumns = csvHeaders.length ? csvHeaders : ['Name', 'Phone'];
   const eligibleContacts = useMemo(() => {
@@ -316,6 +325,7 @@ function onFormSubmit(e) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           id: campaignId,
+          webhook_secret: webhookSecret,
           title: form.title.trim(),
           start_time: startTime,
           join_link: form.joinLink.trim(),
@@ -353,7 +363,10 @@ function onFormSubmit(e) {
             leads.slice(offset, offset + 10).map(async (lead) => {
               const ingestResponse = await fetch(webhookUrl, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {
+                  'Content-Type': 'application/json',
+                  'X-Webhook-Secret': webhookSecret,
+                },
                 body: JSON.stringify(lead),
               });
               if (!ingestResponse.ok) {
@@ -425,6 +438,23 @@ function onFormSubmit(e) {
               >
                 <Copy data-icon="inline-start" />
                 Copy
+              </Button>
+            </div>
+            <p className="text-muted-foreground mt-3 mb-2 text-xs font-medium">
+              Webhook secret · shown once
+            </p>
+            <div className="flex items-center gap-2">
+              <code className="bg-background min-w-0 flex-1 truncate rounded-lg border px-3 py-2 font-mono text-xs">
+                {webhookSecret}
+              </code>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => void copy(webhookSecret)}
+              >
+                <Copy data-icon="inline-start" />
+                Copy secret
               </Button>
             </div>
           </div>
@@ -669,6 +699,24 @@ function onFormSubmit(e) {
                     size="sm"
                     disabled={!webhookUrl}
                     onClick={() => void copy(webhookUrl)}
+                  >
+                    <Copy data-icon="inline-start" />
+                    Copy
+                  </Button>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-muted-foreground shrink-0 text-xs">
+                    Secret
+                  </span>
+                  <code className="bg-background min-w-0 flex-1 truncate rounded-lg border px-3 py-2 font-mono text-xs">
+                    {webhookSecret || 'Generating secret…'}
+                  </code>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={!webhookSecret}
+                    onClick={() => void copy(webhookSecret)}
                   >
                     <Copy data-icon="inline-start" />
                     Copy

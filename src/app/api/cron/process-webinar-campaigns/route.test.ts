@@ -42,18 +42,31 @@ function createAdmin(
   }>
 ) {
   const updates: Array<{ id: string; values: Record<string, unknown> }> = [];
+  const fetchQuery = {
+    order: vi.fn().mockResolvedValue({ data: items, error: null }),
+  };
+  const updateValues: Record<string, unknown>[] = [];
+  const updateQuery = {
+    eq: vi.fn((column: string, value: string) => {
+      if (column === 'id') {
+        updates.push({
+          id: value,
+          values: updateValues[updateValues.length - 1],
+        });
+        return updateQuery;
+      }
+      return Promise.resolve({ error: null });
+    }),
+    in: vi.fn().mockImplementation(() => updateQuery),
+  };
   const queueQuery = {
-    select: vi.fn().mockReturnThis(),
-    eq: vi.fn().mockReturnThis(),
-    lte: vi.fn().mockReturnThis(),
-    order: vi.fn().mockReturnThis(),
-    limit: vi.fn().mockResolvedValue({ data: items, error: null }),
-    update: vi.fn((values: Record<string, unknown>) => ({
-      eq: vi.fn(async (_column: string, id: string) => {
-        updates.push({ id, values });
-        return { error: null };
-      }),
+    select: vi.fn(() => ({
+      in: vi.fn().mockReturnValue(fetchQuery),
     })),
+    update: vi.fn((values: Record<string, unknown>) => {
+      updateValues.push(values);
+      return updateQuery;
+    }),
   };
   const configQuery = {
     select: vi.fn().mockReturnThis(),
@@ -68,6 +81,10 @@ function createAdmin(
     }),
   };
   const admin = {
+    rpc: vi.fn().mockResolvedValue({
+      data: items.map((item) => ({ id: item.id })),
+      error: null,
+    }),
     from: vi.fn((table: string) => {
       if (table === 'webinar_campaign_queue') return queueQuery;
       if (table === 'whatsapp_config') return configQuery;
@@ -143,11 +160,14 @@ describe('/api/cron/process-webinar-campaigns', () => {
 
     const { admin } = createAdmin([]);
     supabaseAdmin.mockReturnValue(admin);
-    const getResponse = await GET(request('GET'));
-    const postResponse = await POST(request('POST'));
+    const getResponse = await GET(request('GET', 'Bearer cron-test-secret'));
+    const postResponse = await POST(request('POST', 'Bearer cron-test-secret'));
 
     expect(getResponse.status).toBe(200);
     expect(postResponse.status).toBe(200);
+    expect(admin.rpc).toHaveBeenCalledWith('claim_due_webinar_campaigns', {
+      p_limit: 20,
+    });
     await expect(getResponse.json()).resolves.toEqual({
       processed: 0,
       successful: 0,
@@ -248,8 +268,23 @@ describe('/api/cron/process-webinar-campaigns', () => {
     expect(updates).toEqual([
       {
         id: 'queue-failed',
-        values: { status: 'failed', error_message: 'Meta rejected template' },
+        values: {
+          status: 'failed',
+          error_message: 'Meta rejected template',
+          processing_started_at: null,
+        },
       },
     ]);
+  });
+
+  it('does not accept the legacy x-cron-secret header', async () => {
+    const response = await GET(
+      new Request('http://localhost/api/cron/process-webinar-campaigns', {
+        method: 'GET',
+        headers: { 'x-cron-secret': 'cron-test-secret' },
+      })
+    );
+    expect(response.status).toBe(401);
+    expect(supabaseAdmin).not.toHaveBeenCalled();
   });
 });

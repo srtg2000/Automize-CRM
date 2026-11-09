@@ -119,7 +119,7 @@ function isAuthorized(request: Request): boolean {
 
   const authorization = request.headers.get('authorization') ?? '';
   const bearer = authorization.match(/^Bearer\s+(.+)$/i)?.[1];
-  const supplied = bearer ?? request.headers.get('x-cron-secret') ?? '';
+  const supplied = bearer ?? '';
   const suppliedBuffer = Buffer.from(supplied);
   const expectedBuffer = Buffer.from(expected);
 
@@ -139,21 +139,54 @@ async function processCampaigns(request: Request) {
 
   try {
     const admin = supabaseAdmin();
+    const { data: claimedRows, error: claimError } = await admin.rpc(
+      'claim_due_webinar_campaigns',
+      { p_limit: BATCH_SIZE }
+    );
+
+    if (claimError) {
+      console.error(
+        '[webinar-campaign-cron] queue claim failed:',
+        claimError.message
+      );
+      return NextResponse.json(
+        { error: 'Failed to claim campaign queue' },
+        { status: 500 }
+      );
+    }
+
+    const claimedIds = ((claimedRows ?? []) as Array<{ id?: unknown } | string>)
+      .map((row: { id?: unknown } | string) =>
+        typeof row === 'string' ? row : row.id
+      )
+      .filter((id): id is string => typeof id === 'string');
+
+    if (claimedIds.length === 0) {
+      return NextResponse.json({ processed: 0, successful: 0, failed: 0 });
+    }
+
     const { data: dueItems, error: fetchError } = await admin
       .from('webinar_campaign_queue')
       .select(
         'id, trigger_type, registrant:webinar_registrants(name, phone, webinar_id, custom_data), webinar:webinars(title, start_time, join_link, recording_link, offer_link, account_id, reminder_rules)'
       )
-      .eq('status', 'pending')
-      .lte('scheduled_for', new Date().toISOString())
-      .order('scheduled_for', { ascending: true })
-      .limit(BATCH_SIZE);
+      .in('id', claimedIds)
+      .order('scheduled_for', { ascending: true });
 
-    if (fetchError) {
-      console.error(
-        '[webinar-campaign-cron] queue fetch failed:',
-        fetchError.message
-      );
+    if (fetchError || !dueItems) {
+      const message = fetchError?.message ?? 'Queue query returned no data';
+      console.error('[webinar-campaign-cron] queue fetch failed:', message);
+      const { error: releaseError } = await admin
+        .from('webinar_campaign_queue')
+        .update({ status: 'pending', processing_started_at: null })
+        .in('id', claimedIds)
+        .eq('status', 'processing');
+      if (releaseError) {
+        console.error(
+          '[webinar-campaign-cron] failed to release claimed rows:',
+          releaseError.message
+        );
+      }
       return NextResponse.json(
         { error: 'Failed to fetch campaign queue' },
         { status: 500 }
@@ -268,10 +301,16 @@ async function processCampaigns(request: Request) {
                 status: 'sent',
                 sent_at: new Date().toISOString(),
                 error_message: null,
+                processing_started_at: null,
               }
-            : { status: 'failed', error_message: errorMessage }
+            : {
+                status: 'failed',
+                error_message: errorMessage,
+                processing_started_at: null,
+              }
         )
-        .eq('id', item.id);
+        .eq('id', item.id)
+        .eq('status', 'processing');
 
       if (updateError) {
         console.error(

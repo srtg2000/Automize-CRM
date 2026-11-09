@@ -147,6 +147,42 @@ describe('/api/webinars', () => {
     expect(response.status).toBe(201);
   });
 
+  it('stores only the hash of a configured webhook secret', async () => {
+    const secret = 'a-long-random-secret-with-at-least-32-chars';
+    const { admin, webinarQuery } = createAdmin();
+    createAdminClient.mockReturnValue(admin);
+
+    const response = await POST(
+      new Request('http://localhost/api/webinars', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          id: '550e8400-e29b-41d4-a716-446655440000',
+          webhook_secret: secret,
+          title: 'AI Masterclass',
+          start_time: '2030-01-02T18:00:00.000Z',
+          join_link: 'https://example.com/join',
+        }),
+      })
+    );
+
+    expect(response.status).toBe(201);
+    expect(webinarQuery.insert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: '550e8400-e29b-41d4-a716-446655440000',
+        webhook_secret_hash: expect.any(String),
+      })
+    );
+    const inserted = vi.mocked(webinarQuery.insert).mock.calls[0][0];
+    expect(inserted).not.toHaveProperty('webhook_secret');
+    expect(inserted.webhook_secret_hash).toBe(
+      (await import('node:crypto'))
+        .createHash('sha256')
+        .update(secret)
+        .digest('hex')
+    );
+  });
+
   it('rejects invalid URLs before writing', async () => {
     const { admin, webinarQuery } = createAdmin();
     createAdminClient.mockReturnValue(admin);

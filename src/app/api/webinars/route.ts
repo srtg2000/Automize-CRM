@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { NextResponse } from 'next/server';
 import { requireRole, toErrorResponse } from '@/lib/auth/account';
 import { supabaseAdmin as createAdminClient } from '@/lib/automations/admin-client';
@@ -9,6 +10,7 @@ import {
 
 interface WebinarInput {
   id?: unknown;
+  webhook_secret?: unknown;
   title?: unknown;
   start_time?: unknown;
   join_link?: unknown;
@@ -70,6 +72,22 @@ function parseWebinarBody(body: WebinarInput) {
     return { error: 'id must be a valid UUID' } as const;
   }
 
+  let webhookSecretHash: string | undefined;
+  if (body.webhook_secret !== undefined) {
+    if (
+      typeof body.webhook_secret !== 'string' ||
+      body.webhook_secret.length < 32 ||
+      body.webhook_secret.length > 512
+    ) {
+      return {
+        error: 'webhook_secret must be between 32 and 512 characters',
+      } as const;
+    }
+    webhookSecretHash = createHash('sha256')
+      .update(body.webhook_secret)
+      .digest('hex');
+  }
+
   const title = typeof body.title === 'string' ? body.title.trim() : '';
   const startTime =
     typeof body.start_time === 'string' ? new Date(body.start_time) : null;
@@ -109,6 +127,7 @@ function parseWebinarBody(body: WebinarInput) {
   return {
     value: {
       id,
+      webhookSecretHash,
       title,
       startTime,
       links,
@@ -232,6 +251,9 @@ export async function POST(request: Request) {
       .from('webinars')
       .insert({
         ...(parsed.value.id ? { id: parsed.value.id } : {}),
+        ...(parsed.value.webhookSecretHash
+          ? { webhook_secret_hash: parsed.value.webhookSecretHash }
+          : {}),
         account_id: accountId,
         title: parsed.value.title,
         start_time: parsed.value.startTime.toISOString(),
@@ -285,7 +307,7 @@ export async function PATCH(request: Request) {
     );
   }
 
-  const parsed = parseWebinarBody(body);
+  const parsed = parseWebinarBody({ ...body, id: undefined });
   if (!parsed.value) {
     return NextResponse.json({ error: parsed.error }, { status: 400 });
   }
@@ -315,6 +337,9 @@ export async function PATCH(request: Request) {
         start_time: parsed.value.startTime.toISOString(),
         ...parsed.value.links,
         reminder_rules: parsed.value.rules,
+        ...(parsed.value.webhookSecretHash
+          ? { webhook_secret_hash: parsed.value.webhookSecretHash }
+          : {}),
       })
       .eq('id', body.id.trim())
       .eq('account_id', accountId)
